@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# mac-screenshot
+#
+# Interactive macOS region capture that:
+#   1. saves a PNG to ~/Documents/Screenshots
+#   2. copies the same PNG image to the clipboard
+#
+# Optional environment variables:
+#   MAC_SCREENSHOT_DIR     Override the destination directory.
+#   MAC_SCREENSHOT_PREFIX  Override the filename prefix.
+#
+
+set -u
+
+SCREENSHOT_DIR="${MAC_SCREENSHOT_DIR:-$HOME/Documents/Screenshots}"
+SCREENSHOT_PREFIX="${MAC_SCREENSHOT_PREFIX:-screenshot}"
+
+notify_error() {
+    message="$1"
+    /usr/bin/osascript -e "display notification \"$message\" with title \"mac-screenshot\"" >/dev/null 2>&1 || true
+}
+
+# Ensure the destination exists.
+if ! /bin/mkdir -p "$SCREENSHOT_DIR"; then
+    notify_error "Could not create the screenshot directory."
+    exit 1
+fi
+
+# Use a sortable, human-readable timestamp.
+timestamp=$(/bin/date '+%Y-%m-%d_%H-%M-%S')
+base="$SCREENSHOT_DIR/$SCREENSHOT_PREFIX-$timestamp"
+output="$base.png"
+
+# Avoid overwriting a capture if two screenshots happen within the same second.
+counter=2
+while [ -e "$output" ]; do
+    output="$base-$counter.png"
+    counter=$((counter + 1))
+done
+
+# Start macOS's native interactive screenshot selection.
+#
+# -i  interactive capture, starting in rectangular selection mode
+# -t  explicitly save as PNG
+#
+# Escape cancels the capture. Space can temporarily switch to window capture,
+# matching the native macOS interaction.
+if ! /usr/sbin/screencapture -i -t png "$output"; then
+    # Cancellation is intentionally silent. Remove any partial file if one exists.
+    [ -e "$output" ] && /bin/rm -f "$output"
+    exit 0
+fi
+
+# A successful capture should produce a non-empty file.
+if [ ! -s "$output" ]; then
+    [ -e "$output" ] && /bin/rm -f "$output"
+    exit 0
+fi
+
+# Put the actual PNG image data on the clipboard, rather than a file reference.
+if ! /usr/bin/osascript - "$output" >/dev/null <<'APPLESCRIPT'
+on run argv
+    set imagePath to item 1 of argv
+    set imageData to read (POSIX file imagePath) as «class PNGf»
+    set the clipboard to imageData
+end run
+APPLESCRIPT
+then
+    notify_error "Screenshot saved, but it could not be copied to the clipboard."
+    exit 1
+fi
+
+exit 0
