@@ -66,6 +66,14 @@ There are no third-party dependencies.
 
 ## Install
 
+Quick Install:
+
+```sh
+git clone https://github.com/zacharysamuelt/mac-shots.git
+cd mac-shots
+sh install.sh
+```
+
 Clone or download the repository and run:
 
 ```sh
