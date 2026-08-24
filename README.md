@@ -1,4 +1,4 @@
-# mac-screenshot
+# mac-shots
 
 A tiny macOS screenshot helper that gives me the workflow I wanted from Windows:
 
